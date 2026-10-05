@@ -1622,7 +1622,7 @@ def start_simulation():
                         }
                         or updater is not None
                     )
-                )
+                ) or SimulationRunner.is_process_alive(simulation_id)
                 if needs_finalization:
                     if not force:
                         return jsonify({
@@ -1646,7 +1646,10 @@ def start_simulation():
                                 f"finalizes safely: {error}"
                             ),
                         }), 409
-                    if stopped.runner_status != RunnerStatus.STOPPED:
+                    if stopped.runner_status not in {
+                        RunnerStatus.STOPPED,
+                        RunnerStatus.COMPLETED,
+                    }:
                         return jsonify({
                             "success": False,
                             "error": "Previous simulation did not reach STOPPED",
@@ -1820,7 +1823,8 @@ def stop_simulation():
         # 更新模拟状态
         manager = SimulationManager()
         state = manager.get_simulation(simulation_id)
-        if state:
+        # Stopping a completed run only closes its environment; keep COMPLETED.
+        if state and run_state.runner_status == RunnerStatus.STOPPED:
             state.status = SimulationStatus.STOPPED
             state.error = None
             manager._save_simulation_state(state)
